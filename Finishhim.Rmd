@@ -1,0 +1,126 @@
+Project of Machine Learning
+============================
+
+##Reading Data
+
+```{r,echo=TRUE}
+TrainP<-read.csv("pml-training.csv",header=TRUE,na.strings=c("NA", "", "#DIV/0!"))
+TestP<-read.csv("pml-testing.csv",header=TRUE,na.strings=c("NA", "", "#DIV/0!"))
+```
+
+Let's remove all the NA
+
+```{r,echo=TRUE}
+NoValues<-c()
+PosNoValues<-c()
+j=1
+for(i in 1:160){
+NoValues[i]<-sum(is.na(TrainP[,i]))
+if(NoValues[i]!=0){
+  PosNoValues[j]=i
+  j=j+1
+}
+}
+TrainingF<-TrainP[,-PosNoValues]
+
+```
+
+No that we have a clean data set we iniciate the analysis
+
+```{r,echo=FALSE,results='hide',warning=FALSE}
+library(ggplot2)
+library(lattice)
+library(caret)
+```
+
+##PreProcces1
+###Random subsampling
+For the first study of the data we are going to use the training set and with it will make a data partition to study the cases
+
+```{r,echo=TRUE}
+set.seed(20598)
+inTrain<-createDataPartition(y=TrainingF$X,p=0.6,list=FALSE)
+Training<-TrainingF[inTrain,]
+Testing<-TrainingF[-inTrain,]
+```
+
+Then we are going to use the PCA tool to see if they fit in the data and made a good predictor
+
+```{r,echo=TRUE}
+
+# #I will remove user_name and other things
+Ftraining<-Training[,-(1:6)]
+preProc1<-preProcess(Ftraining[,-54],method = "pca")
+TrainF1<-predict(preProc1,Ftraining[,-54])
+Outcome<-as.numeric(Ftraining$classe)
+ModelFit1<-train(Outcome~.,method="glm",data=TrainF1)
+Ftesting<-Testing[,-(1:6)]
+TestF1<-predict(preProc1,Ftesting[,-54])
+CM2<-predict(ModelFit1,TestF1)
+CM2<-round(CM2,0)
+#This is not a good technique but...
+confusionMatrix(as.numeric(Ftesting$classe),CM2)
+```
+
+Seeing the table we can affirm that, because the accuraccy (and also the method) this is not a good predictor
+
+##PreProcces2
+
+For the second study of the data we are going to use the training set and with it will make a data partition to study the cases
+
+```{r,echo=TRUE}
+set.seed(13594)
+inTrain<-createDataPartition(y=TrainingF$X,p=0.6,list=FALSE)
+Training<-TrainingF[inTrain,]
+Testing<-TrainingF[-inTrain,]
+```
+
+Now we are going to use the tree technique to establish a predictor
+
+```{r,echo=TRUE}
+Ftraining2<-Training[,-(1:6)]
+Ftesting2<-Testing[,-(1:6)]
+ModelFit2<-train(Ftraining2$classe~.,method="rpart",data=Ftraining2[,-54])
+confusionMatrix(Testing$classe,predict(ModelFit2,Testing))
+```
+
+We see here that is a better predictor that the PCA one but still is not good
+
+##PreProcces3
+
+For the second study of the data we are going to use the training set and with it will make a data partition to study the cases
+
+```{r,echo=TRUE}
+set.seed(54879)
+inTrain<-createDataPartition(y=TrainingF$X,p=0.6,list=FALSE)
+Training<-TrainingF[inTrain,]
+Testing<-TrainingF[-inTrain,]
+```
+
+We are going to remove some variables to make easier the study. Also because the gyros,accel and magnet values are in the three axis and can make noise to the model and we do not want it
+
+
+```{r,echo=TRUE}
+Ftraining3<-Training[,-(1:6)]
+Ftesting3<-Testing[,-(1:6)]
+Nombres<-names(Ftraining3)
+b1<-grep("gyros",Nombres)
+c1<-grep("accel",Nombres)
+d1<-grep("magnet",Nombres)
+Every<-c(b1,c1,d1)
+FinTrain<-Ftraining3[,c(-Every,-54)]
+```
+
+Now we are going to use the random forest technique
+
+```{r,echo=TRUE}
+fitControl<-trainControl(method ="none")
+tgrid<-expand.grid(mtry=c(6)) 
+ModelFit3<-train(Ftraining3$classe~.,method="rf",data=FinTrain,trControl = fitControl, tuneGrid = tgrid)
+FinTest<-Ftesting3[,c(-Every,-54)]
+Pred<-predict(ModelFit3,FinTest)
+confusionMatrix(Pred,Ftesting3$classe)
+```
+
+
+
